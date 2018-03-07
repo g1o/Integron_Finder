@@ -129,96 +129,97 @@ def add_feature(replicon, integron_desc, prot_file, dist_threshold):
     :type replicon: a :class:`Bio.Seq.SeqRecord` object.
     :param integron_desc:
     :type integron_desc: a :class:`pandas.DataFrame`
-    :param prot_file: the path to the fasta file containing the traduction of the replicon.
+    :param str prot_file: the path to the fasta file containing the translation of the replicon.
     :param int dist_threshold: Two elements are aggregated if they are distant of dist_threshold or less.
     """
-
     integron_desc = integron_desc.set_index("ID_integron").copy()
-    for i in integron_desc.index.unique():
-
-        if isinstance(integron_desc.loc[i], pd.Series):
-            type_integron = integron_desc.loc[i].type
-            start_integron = integron_desc.loc[i].pos_beg
-            end_integron = integron_desc.loc[i].pos_end
+    for integron_id in integron_desc.index.unique():
+        if isinstance(integron_desc.loc[integron_id], pd.Series):
+            # There is only one element in this integron
+            the_elt = integron_desc.loc[integron_id]
+            type_integron = the_elt.type
+            start_integron = the_elt.pos_beg
+            end_integron = the_elt.pos_end
             tmp = SeqFeature.SeqFeature(location=SeqFeature.FeatureLocation(start_integron - 1, end_integron),
                                         strand=0,
                                         type="integron",
-                                        qualifiers={"integron_id": i, "integron_type": type_integron}
+                                        qualifiers={"integron_id": integron_id, "integron_type": type_integron}
                                         )
             replicon.features.append(tmp)
-            if integron_desc.loc[i].type_elt == "protein":
+            if the_elt.type_elt == "protein":
 
-                tmp = SeqFeature.SeqFeature(location=SeqFeature.FeatureLocation(integron_desc.loc[i].pos_beg - 1,
-                                                                                integron_desc.loc[i].pos_end),
-                                            strand=integron_desc.loc[i].strand,
-                                            type="CDS" if integron_desc.loc[i].annotation != "intI" else "integrase",
-                                            qualifiers={"protein_id": integron_desc.loc[i].element,
-                                                        "gene": integron_desc.loc[i].annotation,
-                                                        "model": integron_desc.loc[i].model}
+                tmp = SeqFeature.SeqFeature(location=SeqFeature.FeatureLocation(start_integron - 1, end_integron),
+                                            strand=the_elt.strand,
+                                            type="CDS" if the_elt.annotation != "intI" else "integrase",
+                                            qualifiers={"protein_id": the_elt.element,
+                                                        "gene": the_elt.annotation,
+                                                        "model": the_elt.model}
                                             )
 
-                tmp.qualifiers["translation"] = [prt for prt in SeqIO.parse(prot_file, "fasta")
-                                                 if prt.id == integron_desc.loc[i].element][0].seq
+                tmp.qualifiers["translation"] = [prt for prt in read_multi_prot_fasta(prot_file)
+                                                 if prt.id == the_elt.element][0].seq
                 replicon.features.append(tmp)
 
             else:
-                tmp = SeqFeature.SeqFeature(location=SeqFeature.FeatureLocation(integron_desc.loc[i].pos_beg - 1,
-                                                                                integron_desc.loc[i].pos_end),
-                                            strand=integron_desc.loc[i].strand,
-                                            type=integron_desc.loc[i].type_elt,
-                                            qualifiers={integron_desc.loc[i].type_elt: integron_desc.loc[i].element,
-                                                        "model": integron_desc.loc[i].model}
+                tmp = SeqFeature.SeqFeature(location=SeqFeature.FeatureLocation(start_integron - 1, end_integron),
+                                            strand=the_elt.strand,
+                                            type=the_elt.type_elt,
+                                            qualifiers={the_elt.type_elt: the_elt.element, "model": the_elt.model}
                                             )
 
                 replicon.features.append(tmp)
 
         else:
-            type_integron = integron_desc.loc[i].type.values[0]
+            # there are several elements in this integron (promoter, attc, protein, ...)
+            # so desc is a dataframe each row representing one elt
+            integron = integron_desc.loc[integron_id]
+            type_integron = integron.type.values[0]
             # Should only be true if integron over edge of replicon:
-            diff = integron_desc.loc[i].pos_beg.diff() > dist_threshold
+
+            diff = integron.pos_beg.diff() > dist_threshold
 
             if diff.any():
                 pos = np.where(diff)[0][0]
-                start_integron_1 = integron_desc.loc[i].pos_beg.values[pos]
+                start_integron_1 = integron.pos_beg.values[pos]
                 end_integron_1 = len(replicon)
                 start_integron_2 = 1
-                end_integron_2 = integron_desc.loc[i].pos_end.values[pos-1]
+                end_integron_2 = integron.pos_end.values[pos-1]
 
                 f1 = SeqFeature.FeatureLocation(start_integron_1 - 1, end_integron_1)
                 f2 = SeqFeature.FeatureLocation(start_integron_2 - 1, end_integron_2)
                 tmp = SeqFeature.SeqFeature(location=f1 + f2,
                                             strand=0,
                                             type="integron",
-                                            qualifiers={"integron_id": i, "integron_type": type_integron}
+                                            qualifiers={"integron_id": integron_id, "integron_type": type_integron}
                                             )
             else:
-                start_integron = integron_desc.loc[i].pos_beg.values[0]
-                end_integron = integron_desc.loc[i].pos_end.values[-1]
+                start_integron = integron.pos_beg.values[0]
+                end_integron = integron.pos_end.values[-1]
 
                 tmp = SeqFeature.SeqFeature(location=SeqFeature.FeatureLocation(start_integron - 1, end_integron),
                                             strand=0,
                                             type="integron",
-                                            qualifiers={"integron_id": i, "integron_type": type_integron}
+                                            qualifiers={"integron_id": integron_id, "integron_type": type_integron}
                                             )
             replicon.features.append(tmp)
-            for r in integron_desc.loc[i].iterrows():
-                if r[1].type_elt == "protein":
-                    tmp = SeqFeature.SeqFeature(location=SeqFeature.FeatureLocation(r[1].pos_beg - 1, r[1].pos_end),
-                                                strand=r[1].strand,
-                                                type="CDS" if r[1].annotation != "intI" else "integrase",
-                                                qualifiers={"protein_id": r[1].element,
-                                                            "gene": r[1].annotation,
-                                                            "model": r[1].model}
+            for idx, elt in integron.iterrows():
+                if elt.type_elt == "protein":
+                    tmp = SeqFeature.SeqFeature(location=SeqFeature.FeatureLocation(elt.pos_beg - 1, elt.pos_end),
+                                                strand=elt.strand,
+                                                type="CDS" if elt.annotation != "intI" else "integrase",
+                                                qualifiers={"protein_id": elt.element,
+                                                            "gene": elt.annotation,
+                                                            "model": elt.model}
                                                 )
 
-                    tmp.qualifiers["translation"] = [prt for prt in SeqIO.parse(prot_file, "fasta")
-                                                     if prt.id == r[1].element][0].seq
+                    tmp.qualifiers["translation"] = [prt for prt in read_multi_prot_fasta(prot_file)
+                                                     if prt.id == elt.element][0].seq
                     replicon.features.append(tmp)
                 else:
-                    tmp = SeqFeature.SeqFeature(location=SeqFeature.FeatureLocation(r[1].pos_beg - 1, r[1].pos_end),
-                                                strand=r[1].strand,
-                                                type=r[1].type_elt,
-                                                qualifiers={r[1].type_elt: r[1].element, "model": r[1].model}
+                    tmp = SeqFeature.SeqFeature(location=SeqFeature.FeatureLocation(elt.pos_beg - 1, elt.pos_end),
+                                                strand=elt.strand,
+                                                type=elt.type_elt,
+                                                qualifiers={elt.type_elt: elt.element, "model": elt.model}
                                                 )
 
                     replicon.features.append(tmp)
