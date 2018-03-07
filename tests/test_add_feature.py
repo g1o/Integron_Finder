@@ -39,7 +39,7 @@ except ImportError as err:
 from integron_finder.annotation import add_feature
 from integron_finder.utils import read_single_dna_fasta
 
-class TestToGbk(IntegronTest):
+class TestAddFeature(IntegronTest):
 
     def setUp(self):
         """
@@ -47,7 +47,8 @@ class TestToGbk(IntegronTest):
         """
         self.replicon_path = self.find_data(os.path.join('Replicons', "acba.007.p01.13.fst"))
         self.seq = read_single_dna_fasta(self.replicon_path)
-        self.prot_file = self.find_data(os.path.join("Results_Integron_Finder_acba.007.p01.13", "other", "acba.007.p01.13.prt"))
+        self.prot_file = self.find_data(os.path.join("Results_Integron_Finder_acba.007.p01.13", "other",
+                                                     "acba.007.p01.13.prt"))
         self.dist_threshold = 4000
 
 
@@ -143,7 +144,7 @@ class TestToGbk(IntegronTest):
                  "type": "complete",
                  "default": "Yes",
                  "distance_2attC": np.nan
-                }
+                 }
 
         df = pd.DataFrame(infos, index=[0])
 
@@ -540,8 +541,6 @@ class TestToGbk(IntegronTest):
         start_seq = self.seq.seq
         start_id = self.seq.id
         seq_name = self.seq.name
-
-
         self.seq.name = "abcdefgh" + seq_name
 
         add_feature(self.seq, df, self.prot_file, self.dist_threshold)
